@@ -14,161 +14,131 @@
 #include <unistd.h>
 #include <pthread.h>
 
-int n_contas; // número de contas que serão criadas
-// pthread_mutex_t lock;
-int n_threads = 50;
+#define MAX_CONSULTAS 5
 
-typedef struct
-{
+int n_contas; // número de contas que serão criadas
+int n_threads = 100;
+
+typedef struct {
     int id;
     int saldo;
     int limite;
     int fatura;
-    pthread_mutex_t acesso[5];
-}Conta_corrente;
+    pthread_mutex_t mutex_conta;
+    pthread_cond_t cond_consulta;
+    int consultas;
+} Conta_corrente;
+
+Conta_corrente *contas = NULL;
+pthread_mutex_t mutex_global = PTHREAD_MUTEX_INITIALIZER;
+
+void* operacoes(void* arg) {
+    int id = *(int*) arg;
+    int conta = rand() % n_contas;
+    int op = (rand() % 3) + 1;
+    int valor = (rand() % 1000) + 1;
+
+    
+    pthread_mutex_lock(&contas[conta].mutex_conta);
 
 
-Conta_corrente *contas=NULL;
+    if (op == 1 || op == 2) {
+        // Operação débito ou crédito
 
-void* operacoes(void *arg){
-    int conta = *(int*) arg;
+        if (op == 1) {
+            // Operação débito
+            if ((contas[conta].saldo - valor) > 0) {
+                printf("\nThread: %d Compra no débito de R$ %d na conta %d \n", id, valor, conta);
+                contas[conta].saldo -= valor;
+                printf("Saldo antigo: R$ %d \n", contas[conta].saldo + valor);
+                printf("Saldo atual: R$ %d \n", contas[conta].saldo);
+            } else {
+                printf("\nThread: %d Compra no débito de R$ %d negada para a conta %d (saldo insuficiente) \n", id, valor, conta);
+            }
+        } else if (op == 2) {
+            // Operação crédito
+            if ((contas[conta].fatura + valor) < contas[conta].limite) {
+                printf("\nThread: %d Compra no crédito de R$ %d na conta %d \n", id, valor, conta);
+                contas[conta].fatura += valor;
+                printf("Fatura atual: R$ %d\n",contas[conta].fatura);
+                printf("Limite: R$ %d\n",contas[conta].limite);
+            } else {
+                printf("\nThread: %d Compra no crédito de R$ %d negada para a conta %d (limite insuficiente) \n", id, valor, conta);
+            }
+        }
 
-    for (int i = 0; i < 5; i++) {
-        pthread_mutex_lock(&contas[conta].acesso[i]);
-    }
-
-    int op = (rand() % 2) +1;
-    int saldo = contas[conta].saldo;
-    int valor = (rand() % 1000) +1;
     
     
-    switch (op)
-    {
-    case 1:
-        // Operação debito
-        if ((contas[conta].saldo - valor) > 0){
-            printf("Conta %d está sofrendo uma operação de débito no valor de R$ %d \n", conta, valor);
-            contas[conta].saldo -= valor;
+    } else if (op == 3) {
+        // Operação consulta
+        pthread_mutex_lock(&mutex_global);
+        while (contas[conta].consultas >= MAX_CONSULTAS) {
+            pthread_cond_wait(&contas[conta].cond_consulta, &mutex_global);
+        }
+        contas[conta].consultas++;
+        pthread_mutex_unlock(&mutex_global);
 
-            // printf("Saldo antigo: R$ %d \n", saldo);
-            // printf("Saldo atual: R$ %d \n", contas[conta].saldo);
-        }
+        printf("\nThread: %d Consultando saldo da conta %d\nSaldo: R$ %d\nFatura: R$ %d\n", id, conta, contas[conta].saldo, contas[conta].fatura);
 
-        else{
-            printf("Compra no débito de R$ %d negada para a conta %d (saldo insuficente) \n", valor, conta);
-        }
-        break;
-    case 2:
-        // Operação crédito
-        if ((contas[conta].fatura + valor) < contas[conta].limite){
-            printf("Conta %d está sofrendo uma operação de crédito no valor de R$ %d \n", conta, valor);
-            contas[conta].fatura += valor;
-        }
-        else{
-            printf("Compra no crédito de R$ %d negada para a conta %d (limite insuficente) \n", valor, conta);
-        }
-        break;
-    
+
+        pthread_mutex_lock(&mutex_global);
+        contas[conta].consultas--;
+        pthread_cond_signal(&contas[conta].cond_consulta);
+        pthread_mutex_unlock(&mutex_global);
     }
 
-    for (int i = 0; i < 5; i++) {
-        pthread_mutex_unlock(&contas[conta].acesso[i]);
-    }
-
-    free(arg);
+    pthread_mutex_unlock(&contas[conta].mutex_conta);
     pthread_exit(NULL);
 }
 
-void* consulta(void *arg){
-    int aux = 0;
-    int conta = *(int*) arg;
-    while(aux < 5){
-        if(pthread_mutex_trylock(&contas[conta].acesso[aux]) == 0){
-            printf("O saldo da conta %d é: R$ %d \n", conta, contas[conta].saldo);
-            pthread_mutex_unlock(&contas[conta].acesso[aux]);
-            break;
-        }
-        else{
-            aux++;
-        }
-    }
-    free(arg);
-    pthread_exit(NULL);
-}
-
-int main()
-{
-    pthread_t threads[n_threads],consultas[n_threads];
-
+int main() {
+    pthread_t threads[n_threads];
+    
 
     srand(time(NULL));
     printf("Seja bem-vindo ao Clube do Capitalismo Compulsivo(C3) \n");
-    printf("Digite o númnero de contas: ");
+    printf("Digite o número de contas: ");
     scanf("%d", &n_contas);
 
     contas = malloc(n_contas * sizeof(Conta_corrente));
 
-    // pthread_mutex_init(&lock, NULL);
-
-    for(int i = 0; i<n_contas; i++){
+    for (int i = 0; i < n_contas; i++) {
         contas[i].id = i;
-        contas[i].saldo = (rand() % 10000) +1;
+        contas[i].saldo = (rand() % 10000) + 1;
         contas[i].limite = (rand() % 10) * 500 + 500;
         contas[i].fatura = 0;
-        for (int j = 0; j < 5; j++)
-        {
-            pthread_mutex_init(&contas[i].acesso[j], NULL);
-        }
-        
+        pthread_mutex_init(&contas[i].mutex_conta, NULL);
+        pthread_cond_init(&contas[i].cond_consulta, NULL);
+        contas[i].consultas = 0;
     }
 
     printf("\n----- Contas cadastradas -----\n\n");
-
-    for(int i = 0; i<n_contas; i++){
+    for (int i = 0; i < n_contas; i++) {
         printf("Conta: %d ", contas[i].id);
         printf("Saldo: R$ %d ", contas[i].saldo);
         printf("Limite: R$ %d \n", contas[i].limite);
     }
     printf("\n");
 
-    for(int i=0; i<n_threads; i++){
-        
-        int *conta = malloc(sizeof(int));
-        *conta = rand() % n_contas;
-        pthread_create(&threads[i], NULL, operacoes, (void*)conta);
-        
-        int *conta_consulta = malloc(sizeof(int));
-        *conta_consulta = rand() % n_contas;
-        pthread_create(&consultas[i], NULL, consulta, (void*)conta_consulta);
+    for (int i = 0; i < n_threads; i++) {
+        pthread_create(&threads[i], NULL, operacoes, (void*)&i);
     }
 
-    
-    for(int i = 0; i < n_threads; i++) {
+    for (int i = 0; i < n_threads; i++) {
         pthread_join(threads[i], NULL);
     }
 
-    
-    for (int i = 0; i < n_threads; i++)
-    {
-        pthread_join(consultas[i], NULL);
-    }
-    
+    printf("\n");
 
-    for(int i = 0; i<n_contas; i++){
-        printf("Conta: %d ", contas[i].id);
+    for (int i = 0; i < n_contas; i++) {
+        printf("Conta: %d | ", contas[i].id);
         printf("Saldo: R$ %d | ", contas[i].saldo);
         printf("Fatura: R$ %d\n", contas[i].fatura);
+        pthread_mutex_destroy(&contas[i].mutex_conta);
+        pthread_cond_destroy(&contas[i].cond_consulta);
     }
 
-    // pthread_mutex_destroy(&lock);
-    for (int i = 0; i < n_contas; i++)
-    {
-        for (int j = 0; j < 5; j++)
-        {
-            pthread_mutex_destroy(&contas[i].acesso[j]);
-        }
-    }
-    
+    pthread_mutex_destroy(&mutex_global);
     free(contas);
     return 0;
 }
