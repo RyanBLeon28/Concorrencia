@@ -108,7 +108,7 @@ int main() {
 
     for (int i = 0; i < n_threads; i++) {
         pthread_create(&threads[i], NULL, operacoes, NULL);
-        usleep(5000000);
+        usleep(500000);
         
     }
 
