@@ -11,11 +11,11 @@
 #include <semaphore.h>
 #include <unistd.h>
 
-#define N 5  // Número de cadeiras de espera
-int freeChairs = N; 
+int N;  // Número de cadeiras de espera
+int freeChairs; 
 
 int clients = 0;
-int clientsQueue[N];
+int *clientsQueue;
 
 pthread_mutex_t clientsMutex;
 pthread_mutex_t queueMutex;
@@ -48,11 +48,12 @@ void* barber(void* arg) {
         clientID = removeClient();
         pthread_mutex_unlock(&queueMutex);
 
+        // Corta o cabelo
+        printf("Barbeiro está cortando o cabelo do cliente %d ...\n", clientID);
+
         sem_post(&barberReady);       // Barbeiro está pronto para cortar o cabelo
         sem_post(&chairsAccess);      // Libera o acesso às cadeiras de espera
 
-        // Corta o cabelo
-        printf("Barbeiro está cortando o cabelo do cliente %d ...\n", clientID);
         sleep(1); 
     }
     return NULL;
@@ -81,7 +82,6 @@ void* client(void* arg) {
         sem_post(&chairsAccess);  // Libera o acesso às cadeiras de espera
 
         sem_wait(&barberReady);  // Espera o barbeiro ficar pronto
-        printf("Cliente %d está cortando o cabelo...\n", clientID);
     } else {
         printf("Cliente %d foi embora, sem cadeiras disponíveis.\n", clientID);
         sem_post(&chairsAccess);  // Libera o acesso às cadeiras de espera
@@ -92,6 +92,10 @@ void* client(void* arg) {
 
 int main() {
     srand(time(NULL));
+    printf("Digite o numero de cadeiras: ");
+    scanf("%d\n", &N);
+    freeChairs = N;
+    clientsQueue = (int*)malloc(N*sizeof(int));
     pthread_t barber_thread;
     pthread_t client_thread;
 
@@ -114,6 +118,6 @@ int main() {
 
     pthread_mutex_destroy(&clientsMutex);
     pthread_mutex_destroy(&queueMutex);
-
+    free(clientsQueue);
     return 0;
 }
