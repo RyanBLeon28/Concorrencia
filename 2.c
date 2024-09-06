@@ -11,8 +11,8 @@
 #include <semaphore.h>
 #include <unistd.h>
 
-#define N 5  // Número de cadeiras de espera
-int freeChairs = N; 
+int N;  // Número de cadeiras de espera
+int freeChairs ; 
 
 int clients = 0;
 int *clientsQueue;
@@ -91,7 +91,7 @@ void* client(void* arg) {
 }
 
 int main() {
-    printf("fale n : ");
+    printf("Numero de cadeiras : ");
     scanf("%d", &N);
 
     freeChairs = N;
