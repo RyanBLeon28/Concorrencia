@@ -12,10 +12,10 @@
 #include <unistd.h>
 
 int N;  // Número de cadeiras de espera
-int freeChairs ; 
+int freeChairs ; // Numero de cadeiras vazias
 
-int clients = 0;
-int *clientsQueue;
+int clients = 0;    
+int *clientsQueue;  //lista de clientes(fila)
 
 pthread_mutex_t clientsMutex;
 pthread_mutex_t queueMutex;
@@ -30,7 +30,7 @@ void addClientById(int clientID) {
     fim = (fim + 1) % N; // caso tenha que colocar no inicio da fila
 }
 
-int removeClient() {
+int removeClient() {    // remove o cliente da fila de espera
     int clientID = clientsQueue[ini];
     ini = (ini + 1) % N;
     return clientID;
@@ -86,7 +86,6 @@ void* client(void* arg) {
         printf("Cliente %d foi embora, sem cadeiras disponíveis.\n", clientID);
         sem_post(&chairsAccess);  // Libera o acesso às cadeiras de espera
     }
-
     return NULL;
 }
 
@@ -95,26 +94,25 @@ int main() {
     scanf("%d", &N);
 
     freeChairs = N;
-    clientsQueue = (int*)malloc(N*sizeof(int));
+    clientsQueue = (int*)malloc(N*sizeof(int)); // lista de clientes
 
     srand(time(NULL));
 
     pthread_t barber_thread;
     pthread_t client_thread;
 
-    // Inicializa os semáforos
-    sem_init(&barberReady, 0, 0);
-    sem_init(&chairsAccess, 0, 1);
-    sem_init(&clientsReady, 0, 0);
+    sem_init(&barberReady, 0, 0);       // barbeiro começa dormindo
+    sem_init(&chairsAccess, 0, 1);      // cadeira começa disponivel 
+    sem_init(&clientsReady, 0, 0);      // inicialmente não há clientes disponiveis
 
     pthread_mutex_init(&clientsMutex, NULL);
-    pthread_mutex_init(&queueMutex, NULL);
+    pthread_mutex_init(&queueMutex, NULL);      
 
-    pthread_create(&barber_thread, NULL, barber, NULL);
+    pthread_create(&barber_thread, NULL, barber, NULL); // Cria a thread que sera o barbeiro
 
     while (1){
         pthread_create(&client_thread, NULL, client, NULL);
-        pthread_detach(client_thread);
+        pthread_detach(client_thread); // nao precisa do join de threads
         
         sleep(rand() % 2);  // Tempo aleatorio da chegada de um cliente
     }
