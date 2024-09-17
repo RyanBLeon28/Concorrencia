@@ -32,15 +32,15 @@ Conta_corrente *contas = NULL;
 void* operacoes(void* arg) {
 
     while(1){
-        int conta = rand() % n_contas;
-        int op = (rand() % 3) + 1;
-        int valor = (rand() % 1000) + 1;
+        int conta = rand() % n_contas; // Sorteia uma conta
+        int op = (rand() % 3) + 1; // Sorteia uma operação
 
 
 
         if (op == 1 || op == 2) {
             // Operação débito ou crédito
-            pthread_mutex_lock(&contas[conta].mutex_conta);
+            int valor = (rand() % 1000) + 1; // Sorteia um valor
+            pthread_mutex_lock(&contas[conta].mutex_conta); // Bloqueia a conta para executar a operação
             if (op == 1) {
                 // Operação débito
                 if ((contas[conta].saldo - valor) > 0) {
@@ -59,17 +59,17 @@ void* operacoes(void* arg) {
                 sleep(2);
             }
 
-            pthread_mutex_unlock(&contas[conta].mutex_conta);
+            pthread_mutex_unlock(&contas[conta].mutex_conta); // Desbloqueia a conta
         
         
         } else if (op == 3) {
             // Operação consulta
-            if(pthread_mutex_trylock(&contas[conta].mutex_conta) == 0){
-                pthread_mutex_unlock(&contas[conta].mutex_conta);
-                sem_wait(&contas[conta].semaforo);
+            if(pthread_mutex_trylock(&contas[conta].mutex_conta) == 0){ // Verifica se a conta está desbloqueada
+                pthread_mutex_unlock(&contas[conta].mutex_conta); // Libera a conta
+                sem_wait(&contas[conta].semaforo); // Tranca um semáforo semáforo
                 printf("Saldo da conta %d: R$ %d\n",conta, contas[conta].saldo);
                 sleep((rand() % 5)+1);
-                sem_post(&contas[conta].semaforo);
+                sem_post(&contas[conta].semaforo); // Libera o semáforo
             }
             else{
                 printf("Não é possível consultar o saldo da conta %d no momento \n", conta);
@@ -90,13 +90,13 @@ int main() {
     printf("Digite o número de contas: ");
     scanf("%d", &n_contas);
 
-    contas = malloc(n_contas * sizeof(Conta_corrente));
+    contas = malloc(n_contas * sizeof(Conta_corrente)); // Aloca memória
 
     for (int i = 0; i < n_contas; i++) {
         contas[i].id = i;
         contas[i].saldo = (rand() % 10000) + 1;
-        sem_init(&contas[i].semaforo, 0, 5);
-        pthread_mutex_init(&contas[i].mutex_conta, NULL);
+        sem_init(&contas[i].semaforo, 0, 5); // Inicia o semáforo da conta
+        pthread_mutex_init(&contas[i].mutex_conta, NULL); // Inicia o mutex da conta
     }
 
     printf("\n----- Contas cadastradas -----\n\n");
@@ -106,21 +106,21 @@ int main() {
     }
     printf("\n");
 
-    for (int i = 0; i < n_threads; i++) {
+    for (int i = 0; i < n_threads; i++) { // Cria as threads
         pthread_create(&threads[i], NULL, operacoes, NULL);
         usleep(500000);
         
     }
 
-    for (int i = 0; i < n_threads; i++) {
+    for (int i = 0; i < n_threads; i++) { // Aguarda as threads finalizarem
         pthread_join(threads[i], NULL);
     }
 
-    for (int i = 0; i < n_contas; i++) {
+    for (int i = 0; i < n_contas; i++) { // Destrói os mutex e semáforos
         pthread_mutex_destroy(&contas[i].mutex_conta);
         sem_destroy(&contas[i].semaforo);
     }
 
-    free(contas);
+    free(contas); // Libera a memória
     return 0;
 }
