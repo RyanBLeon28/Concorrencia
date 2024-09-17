@@ -19,3 +19,9 @@ gcc -o 3 3.c
 ```
 ./3
 ```
+```
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash
+```
+```
+sudo apt install nodejs
+```
